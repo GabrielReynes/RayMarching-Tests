@@ -1,0 +1,133 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+struct ray
+{
+    float3 origin;
+    float3 direction;
+};
+
+struct ray_hit
+{
+    float distance;
+    float4 color;
+};
+
+struct sphere
+{
+    float3 position;
+    float size;
+    float4 col;
+};
+
+struct cube
+{
+    float3 position;
+    float3 size;
+    float4 col;
+};
+
+float4x4 camera_to_world;
+float4x4 camera_inverse_projection;
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWTexture2D<float4> result;
+int sphere_count, cube_count;
+StructuredBuffer<sphere> spheres;
+StructuredBuffer<cube> cubes;
+
+ray create_ray(const float3 origin, const float3 direction)
+{
+    ray ray;
+    ray.origin = origin;
+    ray.direction = direction;
+    return ray;
+}
+
+ray_hit create_ray_hit()
+{
+    ray_hit ray_hit;
+    ray_hit.distance = 1.#INF;
+    ray_hit.color = float4(0,0,0,1);
+    return ray_hit;
+}
+
+ray create_camera_ray(float2 uv)
+{
+    float3 origin = mul(camera_to_world, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
+    
+    float3 direction = mul(camera_inverse_projection, float4(uv, 0.0f, 1.0f)).xyz;
+
+    direction = mul(camera_to_world, float4(direction, 0.0f)).xyz;
+    return create_ray(origin, normalize(direction));
+}
+
+float sdSphere(const float3 p, const float s )
+{
+    return length(p)-s;
+}
+
+float sdBox(float3 p, float3 b)
+{
+    float3 q = abs(p) - b;
+    return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
+}
+
+void sphere_distances(ray ray, inout ray_hit ray_hit)
+{
+    for (int i = 0; i < sphere_count; i++)
+    {
+        const float dist = sdSphere(ray.origin - spheres[i].position, spheres[i].size);
+        if (dist < ray_hit.distance)
+        {
+            ray_hit.distance = dist;
+            if (dist < 1e-5) ray_hit.color = spheres[i].col;
+        }
+    }
+}
+
+void cube_distances(ray ray, inout ray_hit ray_hit)
+{
+    for (int i = 0; i < cube_count; i++)
+    {
+        const float dist = sdBox(ray.origin - cubes[i].position, cubes[i].size);
+        if (dist < ray_hit.distance)
+        {
+            ray_hit.distance = dist;
+            if (dist < 1e-5) ray_hit.color = cubes[i].col;
+        }
+    }
+}
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    uint width, height;
+    result.GetDimensions(width, height);
+
+    const float2 uv = float2((id.xy + float2(0.5f, 0.5f)) / float2(width, height) * 2.0f - 1.0f);
+
+    ray ray = create_camera_ray(uv);
+    ray_hit ray_hit;
+
+    while(true)
+    {
+        ray_hit = create_ray_hit();
+
+        sphere_distances(ray, ray_hit);
+        cube_distances(ray, ray_hit);
+
+        if (ray_hit.distance < 1e-5 || ray_hit.distance > 1e5) break;
+        
+        ray.origin += ray_hit.distance * ray.direction;
+
+        if (ray.origin.y <= 0)
+        {
+            ray_hit.color = float4(0.5,0.5,0.5,1);
+            break;
+        }
+    }
+    
+    result[id.xy] = ray_hit.color;
+}
