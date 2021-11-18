@@ -1,12 +1,12 @@
 ﻿using MarchingObjects;
 using UnityEngine;
-using Debug = System.Diagnostics.Debug;
 
 public class TextureRenderer : MonoBehaviour
 {
 	private Camera m_camera;
 	private RenderTexture m_renderTexture;
 
+	public new GameObject light;
 	public Sphere[] spheres;
 	public Cube[] cubes;
 	public RayMarchingPanel panel;
@@ -24,6 +24,7 @@ public class TextureRenderer : MonoBehaviour
 		panel.SetShaderParameters(m_camera.cameraToWorldMatrix, m_camera.projectionMatrix.inverse);
 		panel.UpdateSphereBuffer(spheres);
 		panel.UpdateCubeBuffer(cubes);
+		panel.UpdateLightDir(light.transform.forward);
 	}
 
 	public void OnRenderImage(RenderTexture _src, RenderTexture _dest)

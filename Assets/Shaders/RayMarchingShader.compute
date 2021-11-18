@@ -7,12 +7,6 @@ struct ray
     float3 direction;
 };
 
-struct ray_hit
-{
-    float distance;
-    float4 color;
-};
-
 struct sphere
 {
     float3 position;
@@ -20,12 +14,15 @@ struct sphere
     float4 col;
 };
 
-struct cube
+struct box
 {
     float3 position;
     float3 size;
     float4 col;
 };
+
+const float3 light_dir;
+const float4 light_col, background_col;
 
 float4x4 camera_to_world;
 float4x4 camera_inverse_projection;
@@ -35,7 +32,7 @@ float4x4 camera_inverse_projection;
 RWTexture2D<float4> result;
 int sphere_count, cube_count;
 StructuredBuffer<sphere> spheres;
-StructuredBuffer<cube> cubes;
+StructuredBuffer<box> cubes;
 
 ray create_ray(const float3 origin, const float3 direction)
 {
@@ -45,17 +42,9 @@ ray create_ray(const float3 origin, const float3 direction)
     return ray;
 }
 
-ray_hit create_ray_hit()
-{
-    ray_hit ray_hit;
-    ray_hit.distance = 1.#INF;
-    ray_hit.color = float4(0,0,0,1);
-    return ray_hit;
-}
-
 ray create_camera_ray(float2 uv)
 {
-    float3 origin = mul(camera_to_world, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
+    const float3 origin = mul(camera_to_world, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
     
     float3 direction = mul(camera_inverse_projection, float4(uv, 0.0f, 1.0f)).xyz;
 
@@ -65,39 +54,47 @@ ray create_camera_ray(float2 uv)
 
 float sdSphere(const float3 p, const float s )
 {
-    return length(p)-s;
+    return length(p) - s;
 }
 
 float sdBox(float3 p, float3 b)
 {
     float3 q = abs(p) - b;
-    return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
+    return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
 }
 
-void sphere_distances(ray ray, inout ray_hit ray_hit)
+float4 contour(float dist, float4 col)
 {
-    for (int i = 0; i < sphere_count; i++)
-    {
-        const float dist = sdSphere(ray.origin - spheres[i].position, spheres[i].size);
-        if (dist < ray_hit.distance)
-        {
-            ray_hit.distance = dist;
-            if (dist < 1e-5) ray_hit.color = spheres[i].col;
-        }
-    }
+    if (dist > 1e-1) return float4(1,1,1,1)*(1-dist);
+    return col;
 }
 
-void cube_distances(ray ray, inout ray_hit ray_hit)
+float min_dist(float3 pos, out float4 col)
 {
-    for (int i = 0; i < cube_count; i++)
+    float d = 1.#INF;
+    float aux;
+    for (int s = 0; s < sphere_count; ++s)
     {
-        const float dist = sdBox(ray.origin - cubes[i].position, cubes[i].size);
-        if (dist < ray_hit.distance)
-        {
-            ray_hit.distance = dist;
-            if (dist < 1e-5) ray_hit.color = cubes[i].col;
-        }
+        aux = sdSphere(pos-spheres[s].position, spheres[s].size);
+        if (aux < d) {d = aux; col = contour(aux, spheres[s].col);}
     }
+    for (int c = 0; c < cube_count; ++c)
+    {
+        aux = sdBox(pos-cubes[c].position, cubes[c].size);
+        if (aux < d) {d = aux; col = cubes[c].col;}
+    }
+    return d;
+}
+
+//TODO: Understand
+float3 calc_normal(float3 pos, out float4 col)
+{
+    float2 e = float2(1.0, -1.0);
+    const float eps = 5e-4;
+    return normalize( e.xyy * min_dist(pos + e.xyy*eps, col) + 
+                      e.yyx * min_dist(pos + e.yyx*eps, col) + 
+                      e.yxy * min_dist(pos + e.yxy*eps, col) + 
+                      e.xxx * min_dist(pos + e.xxx*eps, col));
 }
 
 [numthreads(8,8,1)]
@@ -108,26 +105,30 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 
     const float2 uv = float2((id.xy + float2(0.5f, 0.5f)) / float2(width, height) * 2.0f - 1.0f);
 
-    ray ray = create_camera_ray(uv);
-    ray_hit ray_hit;
+    const ray ray = create_camera_ray(uv);
 
-    while(true)
+    float4 col;
+    
+    float dist_sum = 0.0;
+    float dist_max = 1e5;
+    
+    for (int i = 0; i < 256; i++)
     {
-        ray_hit = create_ray_hit();
-
-        sphere_distances(ray, ray_hit);
-        cube_distances(ray, ray_hit);
-
-        if (ray_hit.distance < 1e-5 || ray_hit.distance > 1e5) break;
+        const float3 pos = ray.origin + dist_sum * ray.direction;
         
-        ray.origin += ray_hit.distance * ray.direction;
+        const float d = min_dist(pos, col);
 
-        if (ray.origin.y <= 0)
-        {
-            ray_hit.color = float4(0.5,0.5,0.5,1);
-            break;
-        }
+        if( d < 1e-4 || dist_sum > dist_max) break;
+        dist_sum += d;
     }
     
-    result[id.xy] = ray_hit.color;
+    const float3 pos = ray.origin + dist_sum * ray.direction;
+    float3 nor = calc_normal(pos, col);
+    float dif = clamp(dot(nor, -light_dir), 0.0, 1.0);
+    float amb = 0.5 + 0.5*dot(nor, float3(0.0, 1.0, 0.0));
+
+    float4 final = sqrt(col*amb + dif*light_col);
+    
+    if(dist_sum <= dist_max) result[id.xy] = final;
+    else result[id.xy] = background_col;
 }

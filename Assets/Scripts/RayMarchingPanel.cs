@@ -8,6 +8,7 @@ using Debug = System.Diagnostics.Debug;
 public class RayMarchingPanel : ScriptableObject
 {
 	public int width, height;
+	public Color lightColor, backgroundColor;
 
 	public ComputeShader rayMarchingShader;
 
@@ -37,13 +38,32 @@ public class RayMarchingPanel : ScriptableObject
 		m_cubeBuffer.SetData(_cubes.Select(_s => _s.ToMarchingCube()).ToArray());
 	}
 	
+
+	public void UpdateLightDir(Vector3 _lightDir)
+	{
+		rayMarchingShader.SetFloats("light_dir", Vector3ToArray(_lightDir));
+	}
+	
 	public void Dispatch(RenderTexture _renderTexture)
 	{
+		rayMarchingShader.SetFloats("light_col", ColorToArray(lightColor));
+		rayMarchingShader.SetFloats("background_col", ColorToArray(backgroundColor));
+		
 		rayMarchingShader.SetBuffer(0, "spheres", m_sphereBuffer);
 		rayMarchingShader.SetBuffer(0, "cubes", m_cubeBuffer);
 		
 		rayMarchingShader.SetTexture(0, "result", _renderTexture);
 		ComputeHelper.Dispatch(rayMarchingShader, width, height);
+	}
+
+	private float[] Vector3ToArray(Vector3 _v)
+	{
+		return new []{ _v.x, _v.y, _v.z };
+	}
+	
+	private float[] ColorToArray(Color _c)
+	{
+		return new []{ _c.r, _c.g, _c.b, _c.a};
 	}
 
 	public void Dispose()
