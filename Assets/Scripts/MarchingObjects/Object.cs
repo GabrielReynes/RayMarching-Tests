@@ -5,8 +5,9 @@ namespace MarchingObjects
 {
 	public abstract class Object : MonoBehaviour
 	{
-		protected const int c_ObjectByteSize = sizeof(float) * 3 + sizeof(float) * 4;
-
+		//									 - LocalToWorldMatrix - Color	
+		protected const int c_ObjectByteSize = sizeof(float) * 16 + sizeof(float) * 4;
+		
 		public Color color;
 	}
 }

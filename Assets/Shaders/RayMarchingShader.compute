@@ -9,20 +9,22 @@ struct ray
 
 struct sphere
 {
-    float3 position;
+    float4x4 inverse_local;
     float size;
     float4 col;
 };
 
 struct box
 {
-    float3 position;
+    float4x4 inverse_local;
     float3 size;
     float4 col;
+    float rounding_radius;
 };
 
 const float3 light_dir;
-const float4 light_col, background_col;
+const float contour_max = 0.0;
+const float4 light_col, background_col, contour_col;
 
 float4x4 camera_to_world;
 float4x4 camera_inverse_projection;
@@ -45,11 +47,26 @@ ray create_ray(const float3 origin, const float3 direction)
 ray create_camera_ray(float2 uv)
 {
     const float3 origin = mul(camera_to_world, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
-    
     float3 direction = mul(camera_inverse_projection, float4(uv, 0.0f, 1.0f)).xyz;
-
     direction = mul(camera_to_world, float4(direction, 0.0f)).xyz;
     return create_ray(origin, normalize(direction));
+}
+
+inline float3 opTx( in float3 p, in float4x4 t)
+{
+    return mul(t, float4(p, 1.0f)).xyz;
+}
+
+float3 opRep( in float3 p, in float3 c)
+{
+    const float3 mid = 0.5*c;
+    return fmod(p+mid, c) - mid;
+}
+
+float4 opElongate( in float3 p, in float3 h )
+{
+    float3 q = abs(p)-h;
+    return float4(max(q,0.0), min(max(q.x,max(q.y,q.z)), 0.0));
 }
 
 float sdSphere(const float3 p, const float s )
@@ -63,26 +80,21 @@ float sdBox(float3 p, float3 b)
     return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
 }
 
-float4 contour(float dist, float4 col)
-{
-    if (dist > 1e-1) return float4(1,1,1,1)*(1-dist);
-    return col;
-}
-
 float min_dist(float3 pos, out float4 col)
 {
     float d = 1.#INF;
     float aux;
     for (int s = 0; s < sphere_count; ++s)
     {
-        aux = sdSphere(pos-spheres[s].position, spheres[s].size);
-        if (aux < d) {d = aux; col = contour(aux, spheres[s].col);}
+        aux = sdSphere(opTx(pos, spheres[s].inverse_local), spheres[s].size);
+        if (aux < d) {d = aux; col = spheres[s].col;}
     }
     for (int c = 0; c < cube_count; ++c)
     {
-        aux = sdBox(pos-cubes[c].position, cubes[c].size);
+        aux = sdBox(opTx(pos, cubes[c].inverse_local), cubes[c].size) - cubes[c].rounding_radius;
         if (aux < d) {d = aux; col = cubes[c].col;}
     }
+    
     return d;
 }
 
@@ -97,7 +109,21 @@ float3 calc_normal(float3 pos, out float4 col)
                       e.xxx * min_dist(pos + e.xxx*eps, col));
 }
 
-[numthreads(8,8,1)]
+float soft_shadow( in float3 ro, in float3 rd, float mint, float maxt, float k)
+{
+    float res = 1.0;
+    for( float t=mint; t<maxt; )
+    {
+        float4 garbage;
+        float h = min_dist(ro + rd*t, garbage);
+        if(h < mint) return 0.0;
+        res = min(res, k*h/t);
+        t += h;
+    }
+    return res;
+}
+
+[numthreads(16,16,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
     uint width, height;
@@ -110,25 +136,30 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     float4 col;
     
     float dist_sum = 0.0;
-    float dist_max = 1e5;
+    const float min_step = 1e-4, max_step = 1e3;
+    float min_registered = max_step;
     
     for (int i = 0; i < 256; i++)
     {
         const float3 pos = ray.origin + dist_sum * ray.direction;
         
         const float d = min_dist(pos, col);
-
-        if( d < 1e-4 || dist_sum > dist_max) break;
+        min_registered = min(min_registered, d);
         dist_sum += d;
+        if (d < min_step || dist_sum > max_step) break;
     }
     
     const float3 pos = ray.origin + dist_sum * ray.direction;
-    float3 nor = calc_normal(pos, col);
-    float dif = clamp(dot(nor, -light_dir), 0.0, 1.0);
-    float amb = 0.5 + 0.5*dot(nor, float3(0.0, 1.0, 0.0));
-
-    float4 final = sqrt(col*amb + dif*light_col);
+    const float3 nor = calc_normal(pos, col);
     
-    if(dist_sum <= dist_max) result[id.xy] = final;
+    const float dif = clamp(dot(nor, -light_dir), 0.0, 1.0);
+        // * soft_shadow(pos, -light_dir, min_step, 3.0, 1);
+    const float amb = (dot(nor, float3(0, 1, 0)) + 1) / 2;
+
+    const float4 final = sqrt(col*amb + dif*light_col);
+    
+    if(dist_sum <= max_step) result[id.xy] = final;
+    else if (min_registered < contour_max)
+        result[id.xy] = contour_col * (contour_max - min_registered) / contour_max;
     else result[id.xy] = background_col;
 }

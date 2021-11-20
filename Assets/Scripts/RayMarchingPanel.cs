@@ -9,6 +9,8 @@ public class RayMarchingPanel : ScriptableObject
 {
 	public int width, height;
 	public Color lightColor, backgroundColor;
+	[Range(0f, 1f)] public float contourWidth; 	
+	public Color contourColor;
 
 	public ComputeShader rayMarchingShader;
 
@@ -42,13 +44,15 @@ public class RayMarchingPanel : ScriptableObject
 	public void UpdateLightDir(Vector3 _lightDir)
 	{
 		rayMarchingShader.SetFloats("light_dir", Vector3ToArray(_lightDir));
+		
+		rayMarchingShader.SetFloats("light_col", ColorToArray(lightColor));
+		rayMarchingShader.SetFloats("background_col", ColorToArray(backgroundColor));
+		rayMarchingShader.SetFloats("contour_col", ColorToArray(contourColor));
+		rayMarchingShader.SetFloat("contour_max", contourWidth);
 	}
 	
 	public void Dispatch(RenderTexture _renderTexture)
 	{
-		rayMarchingShader.SetFloats("light_col", ColorToArray(lightColor));
-		rayMarchingShader.SetFloats("background_col", ColorToArray(backgroundColor));
-		
 		rayMarchingShader.SetBuffer(0, "spheres", m_sphereBuffer);
 		rayMarchingShader.SetBuffer(0, "cubes", m_cubeBuffer);
 		

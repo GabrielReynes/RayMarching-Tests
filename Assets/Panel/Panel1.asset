@@ -14,6 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   width: 1920
   height: 1080
-  lightColor: {r: 0.42437953, g: 0.9811321, b: 0, a: 0}
-  backgroundColor: {r: 0.09433961, g: 0.09433961, b: 0.09433961, a: 0}
+  lightColor: {r: 0.38679248, g: 0.38679248, b: 0.38679248, a: 0}
+  backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  contourWidth: 0
+  contourColor: {r: 0.5377358, g: 0.08406651, b: 0.08406651, a: 0}
   rayMarchingShader: {fileID: 7200000, guid: e62798c7143c7f142a4f8c6f3766c5e4, type: 3}

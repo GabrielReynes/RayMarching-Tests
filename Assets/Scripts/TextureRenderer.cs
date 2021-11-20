@@ -19,17 +19,18 @@ public class TextureRenderer : MonoBehaviour
 		panel.Init(spheres.Length, cubes.Length);
 	}
 
-	public void Update()
+	public void FixedUpdate()
 	{
 		panel.SetShaderParameters(m_camera.cameraToWorldMatrix, m_camera.projectionMatrix.inverse);
 		panel.UpdateSphereBuffer(spheres);
 		panel.UpdateCubeBuffer(cubes);
 		panel.UpdateLightDir(light.transform.forward);
+		
+		panel.Dispatch(m_renderTexture);
 	}
 
 	public void OnRenderImage(RenderTexture _src, RenderTexture _dest)
 	{
-		panel.Dispatch(m_renderTexture);
 		Graphics.Blit(m_renderTexture, _dest);
 	}
 	

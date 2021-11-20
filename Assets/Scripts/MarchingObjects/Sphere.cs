@@ -1,19 +1,21 @@
-﻿using System.Linq;
+﻿using System.Drawing;
+using System.Linq;
 using UnityEngine;
+using Color = UnityEngine.Color;
 
 namespace MarchingObjects
 {
 	public class Sphere : Object
 	{
 		public static readonly int SphereByteSize = c_ObjectByteSize + sizeof(float);
-			
-		public float size;
 
+		[Range(1f, 10f)] public float size;
+		
 		public MarchingSphere ToMarchingSphere()
 		{
 			return new MarchingSphere
 			{
-				Position = transform.position,
+				LocalToWorld = transform.worldToLocalMatrix,
 				Size = size,
 				Color = color
 			};
@@ -22,7 +24,7 @@ namespace MarchingObjects
 
 	public struct MarchingSphere
 	{
-		public Vector3 Position;
+		public Matrix4x4 LocalToWorld;
 		public float Size;
 		public Color Color;
 	}
