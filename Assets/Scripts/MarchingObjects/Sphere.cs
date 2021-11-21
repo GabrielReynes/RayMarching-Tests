@@ -7,7 +7,7 @@ namespace MarchingObjects
 {
 	public class Sphere : Object
 	{
-		public static readonly int SphereByteSize = c_ObjectByteSize + sizeof(float);
+		public const int c_SphereByteSize = c_ObjectByteSize + sizeof(float);
 
 		[Range(1f, 10f)] public float size;
 		

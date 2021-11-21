@@ -9,8 +9,6 @@ public class RayMarchingPanel : ScriptableObject
 {
 	public int width, height;
 	public Color lightColor, backgroundColor;
-	[Range(0f, 1f)] public float contourWidth; 	
-	public Color contourColor;
 
 	public ComputeShader rayMarchingShader;
 
@@ -18,8 +16,8 @@ public class RayMarchingPanel : ScriptableObject
 
 	public void Init(int _sphereCount, int _cubeCount)
 	{
-		m_sphereBuffer = new ComputeBuffer(_sphereCount, Sphere.SphereByteSize);
-		m_cubeBuffer = new ComputeBuffer(_cubeCount, Cube.CubeByteSize);
+		m_sphereBuffer = new ComputeBuffer(_sphereCount, Sphere.c_SphereByteSize);
+		m_cubeBuffer = new ComputeBuffer(_cubeCount, Cube.c_CubeByteSize);
 		rayMarchingShader.SetInt("sphere_count", _sphereCount);
 		rayMarchingShader.SetInt("cube_count", _cubeCount);
 	}
@@ -47,8 +45,6 @@ public class RayMarchingPanel : ScriptableObject
 		
 		rayMarchingShader.SetFloats("light_col", ColorToArray(lightColor));
 		rayMarchingShader.SetFloats("background_col", ColorToArray(backgroundColor));
-		rayMarchingShader.SetFloats("contour_col", ColorToArray(contourColor));
-		rayMarchingShader.SetFloat("contour_max", contourWidth);
 	}
 	
 	public void Dispatch(RenderTexture _renderTexture)

@@ -5,7 +5,7 @@ namespace MarchingObjects
 	public class Cube : Object
 	{
 		//														   - Size              - RoundingRadius
-		public static readonly int CubeByteSize = c_ObjectByteSize + sizeof(float) * 3 + sizeof(float);
+		public const int c_CubeByteSize = c_ObjectByteSize + sizeof(float) * 3 + sizeof(float);
 
 		[Range(0f, 5f)] public float roundingRadius;
 		public Vector3 size;

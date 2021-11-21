@@ -23,8 +23,7 @@ struct box
 };
 
 const float3 light_dir;
-const float contour_max = 0.0;
-const float4 light_col, background_col, contour_col;
+const float4 light_col, background_col;
 
 float4x4 camera_to_world;
 float4x4 camera_inverse_projection;
@@ -69,6 +68,11 @@ float4 opElongate( in float3 p, in float3 h )
     return float4(max(q,0.0), min(max(q.x,max(q.y,q.z)), 0.0));
 }
 
+inline float sdPlane(const float3 p)
+{
+    return p.y;
+}
+
 float sdSphere(const float3 p, const float s )
 {
     return length(p) - s;
@@ -83,22 +87,25 @@ float sdBox(float3 p, float3 b)
 float min_dist(float3 pos, out float4 col)
 {
     float d = 1.#INF;
-    float aux;
     for (int s = 0; s < sphere_count; ++s)
     {
-        aux = sdSphere(opTx(pos, spheres[s].inverse_local), spheres[s].size);
+        const float3 tx = opTx(pos, spheres[s].inverse_local);
+        const float3 rep = opRep(tx, float3(20,20,20));
+        const float aux = sdSphere(rep, spheres[s].size);
         if (aux < d) {d = aux; col = spheres[s].col;}
     }
     for (int c = 0; c < cube_count; ++c)
     {
-        aux = sdBox(opTx(pos, cubes[c].inverse_local), cubes[c].size) - cubes[c].rounding_radius;
+        const float aux = sdBox(opTx(pos, cubes[c].inverse_local), cubes[c].size) - cubes[c].rounding_radius;
         if (aux < d) {d = aux; col = cubes[c].col;}
     }
+
+    const float ground = sdPlane(pos);
+    if (ground < d) {d = ground; col = float4(0.1,0.1,0.1,1);}
     
     return d;
 }
 
-//TODO: Understand
 float3 calc_normal(float3 pos, out float4 col)
 {
     float2 e = float2(1.0, -1.0);
@@ -112,15 +119,44 @@ float3 calc_normal(float3 pos, out float4 col)
 float soft_shadow( in float3 ro, in float3 rd, float mint, float maxt, float k)
 {
     float res = 1.0;
-    for( float t=mint; t<maxt; )
+    float t = mint, ph = 1e20;
+    for ( int i=0; i<16; i++ )
     {
         float4 garbage;
-        float h = min_dist(ro + rd*t, garbage);
-        if(h < mint) return 0.0;
-        res = min(res, k*h/t);
+        const float h = min_dist(ro + rd*t, garbage);
+        if(h < 5e-4*t) return 0.0;
+        if(t > maxt) return 1.0;
+        float y = h*h/(2.0*ph);
+        float d = sqrt(h*h-y*y);
+        res = min( res, k*d/max(0.0,t-y) );
+        ph = h;
         t += h;
     }
     return res;
+}
+
+float cast_ray( in float3 ro, in float3 rd , in float tmax, out float4 col)
+{
+    const float tmin = 1.0;
+   
+    // bounding volume
+    // const float tp1 = (0.0-ro.y)/rd.y;
+    // if( tp1>0.0 ) tmax = min( tmax, tp1 );
+    // const float tp2 = (1.0-ro.y)/rd.y;
+    // if( tp2>0.0 ) {
+    //     if( ro.y>1.0 ) tmin = max( tmin, tp2 );
+    //     else           tmax = min( tmax, tp2 );
+    // }
+    
+    float t = tmin;
+    for( int i=0; i<64; i++ )
+    {
+        const float precis = 5e-4*t;
+        const float res = min_dist(ro+rd*t , col);
+        if( res<precis || t>tmax ) break;
+        t += res;
+    }
+    return t;
 }
 
 [numthreads(16,16,1)]
@@ -132,34 +168,26 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     const float2 uv = float2((id.xy + float2(0.5f, 0.5f)) / float2(width, height) * 2.0f - 1.0f);
 
     const ray ray = create_camera_ray(uv);
+    const float dist_max = 2e2;
 
     float4 col;
+    const float dist = cast_ray(ray.origin, ray.direction, dist_max, col);
     
-    float dist_sum = 0.0;
-    const float min_step = 1e-4, max_step = 1e3;
-    float min_registered = max_step;
-    
-    for (int i = 0; i < 256; i++)
+    if (dist < dist_max)
     {
-        const float3 pos = ray.origin + dist_sum * ray.direction;
-        
-        const float d = min_dist(pos, col);
-        min_registered = min(min_registered, d);
-        dist_sum += d;
-        if (d < min_step || dist_sum > max_step) break;
-    }
+        const float3 pos = ray.origin + dist * ray.direction;
+        const float3 nor = calc_normal(pos, col);
     
-    const float3 pos = ray.origin + dist_sum * ray.direction;
-    const float3 nor = calc_normal(pos, col);
-    
-    const float dif = clamp(dot(nor, -light_dir), 0.0, 1.0);
-        // * soft_shadow(pos, -light_dir, min_step, 3.0, 1);
-    const float amb = (dot(nor, float3(0, 1, 0)) + 1) / 2;
+        const float dif = clamp(dot(nor, -light_dir), 0.0, 1.0)
+            * soft_shadow(pos, -light_dir, 1.0, 5e1, 32);
+        const float amb = (dot(nor, float3(0, 1, 0)) + 1) / 2;
 
-    const float4 final = sqrt(col*amb + dif*light_col);
-    
-    if(dist_sum <= max_step) result[id.xy] = final;
-    else if (min_registered < contour_max)
-        result[id.xy] = contour_col * (contour_max - min_registered) / contour_max;
-    else result[id.xy] = background_col;
+        const float4 final = sqrt(col*amb + dif*light_col);
+
+        result[id.xy] = final;
+    }
+    else
+    {
+        result[id.xy] = background_col;
+    }
 }
