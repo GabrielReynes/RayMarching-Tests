@@ -15,17 +15,15 @@ namespace MarchingObjects
 		{
 			return new MarchingSphere
 			{
-				LocalToWorld = transform.worldToLocalMatrix,
-				Size = size,
-				Color = color
+				Object = ToMarchingObject(),
+				Size = size
 			};
 		}
 	}
 
 	public struct MarchingSphere
 	{
-		public Matrix4x4 LocalToWorld;
+		public MarchingObject Object;
 		public float Size;
-		public Color Color;
 	}
 }

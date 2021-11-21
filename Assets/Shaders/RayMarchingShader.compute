@@ -7,18 +7,24 @@ struct ray
     float3 direction;
 };
 
-struct sphere
+struct object
 {
     float4x4 inverse_local;
-    float size;
     float4 col;
+    int3 rep;
+    float freq;
+};
+
+struct sphere
+{
+    object object;
+    float size;
 };
 
 struct box
 {
-    float4x4 inverse_local;
+    object object;
     float3 size;
-    float4 col;
     float rounding_radius;
 };
 
@@ -56,10 +62,9 @@ inline float3 opTx( in float3 p, in float4x4 t)
     return mul(t, float4(p, 1.0f)).xyz;
 }
 
-float3 opRep( in float3 p, in float3 c)
+float3 opRepLim( in float3 p, in float c, in float3 l)
 {
-    const float3 mid = 0.5*c;
-    return fmod(p+mid, c) - mid;
+    return p - c * clamp(round(p/c), -l, l);
 }
 
 float4 opElongate( in float3 p, in float3 h )
@@ -84,20 +89,25 @@ float sdBox(float3 p, float3 b)
     return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
 }
 
+inline float3 transformObject(const float3 pos, object object)
+{
+    return opRepLim(opTx(pos, object.inverse_local), object.freq, object.rep);
+}
+
 float min_dist(float3 pos, out float4 col)
 {
     float d = 1.#INF;
     for (int s = 0; s < sphere_count; ++s)
     {
-        const float3 tx = opTx(pos, spheres[s].inverse_local);
-        const float3 rep = opRep(tx, float3(20,20,20));
-        const float aux = sdSphere(rep, spheres[s].size);
-        if (aux < d) {d = aux; col = spheres[s].col;}
+        const float3 tx = transformObject(pos, spheres[s].object);
+        const float aux = sdSphere(tx, spheres[s].size);
+        if (aux < d) {d = aux; col = spheres[s].object.col;}
     }
     for (int c = 0; c < cube_count; ++c)
     {
-        const float aux = sdBox(opTx(pos, cubes[c].inverse_local), cubes[c].size) - cubes[c].rounding_radius;
-        if (aux < d) {d = aux; col = cubes[c].col;}
+        const float3 tx = transformObject(pos, cubes[c].object);
+        const float aux = sdBox(tx, cubes[c].size) - cubes[c].rounding_radius;
+        if (aux < d) {d = aux; col = cubes[c].object.col;}
     }
 
     const float ground = sdPlane(pos);

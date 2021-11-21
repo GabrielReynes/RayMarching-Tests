@@ -14,9 +14,8 @@ namespace MarchingObjects
 		{
 			return new MarchingCube
 			{
-				LocalToWorld = transform.worldToLocalMatrix,
+				Object = ToMarchingObject(),
 				Size = size,
-				Color = color,
 				RoundingRadius = roundingRadius
 			};
 		}
@@ -24,9 +23,8 @@ namespace MarchingObjects
 
 	public struct MarchingCube
 	{
-		public Matrix4x4 LocalToWorld;
+		public MarchingObject Object;
 		public Vector3 Size;
-		public Color Color;
 		public float RoundingRadius;
 	}
 }
