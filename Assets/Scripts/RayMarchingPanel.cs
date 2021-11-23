@@ -9,6 +9,9 @@ public class RayMarchingPanel : ScriptableObject
 {
 	public int width, height;
 	public Color lightColor, backgroundColor;
+	
+	[Range(50f, 200f)] public float distanceMax, shadowDistance;
+	[Range(0,10)] public int blurFactor, levelOfDetail;
 
 	public ComputeShader rayMarchingShader;
 
@@ -39,12 +42,17 @@ public class RayMarchingPanel : ScriptableObject
 	}
 	
 
-	public void UpdateLightDir(Vector3 _lightDir)
+	public void UpdateParameters(Vector3 _lightDir)
 	{
 		rayMarchingShader.SetFloats("light_dir", Vector3ToArray(_lightDir));
 		
 		rayMarchingShader.SetFloats("light_col", ColorToArray(lightColor));
 		rayMarchingShader.SetFloats("background_col", ColorToArray(backgroundColor));
+		
+		rayMarchingShader.SetFloat("dist_max", distanceMax);
+		rayMarchingShader.SetFloat("shadow_dist", shadowDistance);
+		rayMarchingShader.SetFloat("blur_factor", 10/(blurFactor%2+1) * Mathf.Pow(10, -blurFactor));
+		rayMarchingShader.SetFloat("lod", 5*Mathf.Pow(10, -levelOfDetail));
 	}
 	
 	public void Dispatch(RenderTexture _renderTexture)

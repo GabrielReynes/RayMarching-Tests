@@ -30,6 +30,7 @@ struct box
 
 const float3 light_dir;
 const float4 light_col, background_col;
+float blur_factor, dist_max, lod, shadow_dist;
 
 float4x4 camera_to_world;
 float4x4 camera_inverse_projection;
@@ -161,7 +162,7 @@ float cast_ray( in float3 ro, in float3 rd , in float tmax, out float4 col)
     float t = tmin;
     for( int i=0; i<64; i++ )
     {
-        const float precis = 5e-4*t;
+        const float precis = lod*t;
         const float res = min_dist(ro+rd*t , col);
         if( res<precis || t>tmax ) break;
         t += res;
@@ -178,7 +179,6 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     const float2 uv = float2((id.xy + float2(0.5f, 0.5f)) / float2(width, height) * 2.0f - 1.0f);
 
     const ray ray = create_camera_ray(uv);
-    const float dist_max = 2e2;
 
     float4 col;
     const float dist = cast_ray(ray.origin, ray.direction, dist_max, col);
@@ -186,13 +186,18 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     if (dist < dist_max)
     {
         const float3 pos = ray.origin + dist * ray.direction;
-        const float3 nor = calc_normal(pos, col);
+
+        float3 nor;
+        if (pos.y < 1e-2) nor = float3(0,1,0);
+        else nor = calc_normal(pos, col);
     
         const float dif = clamp(dot(nor, -light_dir), 0.0, 1.0)
-            * soft_shadow(pos, -light_dir, 1.0, 5e1, 32);
+            * soft_shadow(pos, -light_dir, 1.0, shadow_dist, 64);
         const float amb = (dot(nor, float3(0, 1, 0)) + 1) / 2;
 
-        const float4 final = sqrt(col*amb + dif*light_col);
+        float4 final = col*amb + dif*light_col;
+        final *= exp(-blur_factor * dist*dist*dist );
+        final = pow(abs(final), 0.4545);
 
         result[id.xy] = final;
     }

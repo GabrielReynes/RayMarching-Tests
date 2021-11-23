@@ -24,7 +24,7 @@ public class TextureRenderer : MonoBehaviour
 		panel.SetShaderParameters(m_camera.cameraToWorldMatrix, m_camera.projectionMatrix.inverse);
 		panel.UpdateSphereBuffer(spheres);
 		panel.UpdateCubeBuffer(cubes);
-		panel.UpdateLightDir(light.transform.forward);
+		panel.UpdateParameters(light.transform.forward);
 		
 		panel.Dispatch(m_renderTexture);
 	}

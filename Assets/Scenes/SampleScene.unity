@@ -268,8 +268,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   color: {r: 0, g: 0.7151816, b: 1, a: 0}
-  repetitions: {x: 0, y: 0, z: 0}
-  frequency: 1
+  repetitions: {x: 2, y: 0, z: 100}
+  frequency: 4.9
   roundingRadius: 0
   size: {x: 1, y: 1, z: 1}
 --- !u!4 &595461287
