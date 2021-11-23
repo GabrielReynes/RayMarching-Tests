@@ -1,8 +1,6 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿using System.Linq;
 using MarchingObjects;
 using UnityEngine;
-using Debug = System.Diagnostics.Debug;
 
 [CreateAssetMenu]
 public class RayMarchingPanel : ScriptableObject
@@ -10,7 +8,7 @@ public class RayMarchingPanel : ScriptableObject
 	public int width, height;
 	public Color lightColor, backgroundColor;
 	
-	[Range(50f, 200f)] public float distanceMax, shadowDistance;
+	[Range(50f, 200f)] public float distanceMax, shadowDistance, reflectionDistance;
 	[Range(0,10)] public int blurFactor, levelOfDetail;
 
 	public ComputeShader rayMarchingShader;
@@ -51,6 +49,7 @@ public class RayMarchingPanel : ScriptableObject
 		
 		rayMarchingShader.SetFloat("dist_max", distanceMax);
 		rayMarchingShader.SetFloat("shadow_dist", shadowDistance);
+		rayMarchingShader.SetFloat("refl_dist", reflectionDistance);
 		rayMarchingShader.SetFloat("blur_factor", 10/(blurFactor%2+1) * Mathf.Pow(10, -blurFactor));
 		rayMarchingShader.SetFloat("lod", 5*Mathf.Pow(10, -levelOfDetail));
 	}

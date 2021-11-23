@@ -30,7 +30,7 @@ struct box
 
 const float3 light_dir;
 const float4 light_col, background_col;
-float blur_factor, dist_max, lod, shadow_dist;
+float blur_factor, dist_max, lod, shadow_dist, refl_dist;
 
 float4x4 camera_to_world;
 float4x4 camera_inverse_projection;
@@ -190,6 +190,12 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         float3 nor;
         if (pos.y < 1e-2) nor = float3(0,1,0);
         else nor = calc_normal(pos, col);
+        
+        const float3 refl = ray.direction - 2 * nor * dot(ray.direction, nor);
+        float4 comp;
+        const float comp_dist = cast_ray(pos, refl, refl_dist, comp);
+        if (comp_dist < refl_dist) col = (col + comp) / 2;
+        // else col = (col + background_col) / 2;
     
         const float dif = clamp(dot(nor, -light_dir), 0.0, 1.0)
             * soft_shadow(pos, -light_dir, 1.0, shadow_dist, 64);
