@@ -14,11 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   width: 960
   height: 540
-  lightColor: {r: 0.8, g: 0.7, b: 0.5, a: 0}
+  lightColor: {r: 0, g: 0, b: 0, a: 0}
   backgroundColor: {r: 0, g: 0, b: 0, a: 0}
-  distanceMax: 93
-  shadowDistance: 50
-  reflectionDistance: 200
-  blurFactor: 6
+  distanceMax: 250
+  shadowDistance: 145
+  reflectionDistance: 120
+  blurFactor: 7
   levelOfDetail: 5
   rayMarchingShader: {fileID: 7200000, guid: e62798c7143c7f142a4f8c6f3766c5e4, type: 3}

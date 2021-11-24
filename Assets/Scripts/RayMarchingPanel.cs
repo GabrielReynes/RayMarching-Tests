@@ -8,7 +8,7 @@ public class RayMarchingPanel : ScriptableObject
 	public int width, height;
 	public Color lightColor, backgroundColor;
 	
-	[Range(50f, 200f)] public float distanceMax, shadowDistance, reflectionDistance;
+	[Range(50f, 300f)] public float distanceMax, shadowDistance, reflectionDistance;
 	[Range(0,10)] public int blurFactor, levelOfDetail;
 
 	public ComputeShader rayMarchingShader;
