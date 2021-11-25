@@ -11,6 +11,7 @@ struct object
 {
     float4x4 inverse_local;
     float4 col;
+    float reflectivity;
     int3 rep;
     float freq;
 };
